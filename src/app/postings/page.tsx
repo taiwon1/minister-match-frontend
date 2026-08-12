@@ -1,82 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { MINISTRY_PARTS } from '@/lib/options';
 
-interface Posting {
-  id: string;
-  serviceDate: string;
-  neededInstruments: string[];
-  location: string;
-  guideNote: string | null;
-  status: 'OPEN' | 'CLOSED';
-  churchProfile: {
-    churchName: string;
-    region: string | null;
-  };
-}
-
-export default function PostingsPage() {
-  const [postings, setPostings] = useState<Posting[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    apiFetch<Posting[]>('/postings')
-      .then(setPostings)
-      .catch((err) => setError(err instanceof Error ? err.message : '불러오기에 실패했습니다.'))
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  if (isLoading) {
-    return <div className="flex-1 p-8 text-center text-gray-500">불러오는 중...</div>;
-  }
-
-  if (error) {
-    return <div className="flex-1 p-8 text-center text-red-600">{error}</div>;
-  }
-
-  return (
-    <div className="flex-1 bg-white px-4 py-8">
-      <div className="mx-auto max-w-2xl">
-        <h1 className="mb-6 text-xl font-bold text-[#1E3A5F]">사역 공고</h1>
-
-        {postings.length === 0 ? (
-          <p className="text-gray-500">등록된 공고가 없습니다.</p>
-        ) : (
-          <ul className="space-y-3">
-            {postings.map((posting) => (
-              <li key={posting.id}>
-                <Link
-                  href={`/postings/${posting.id}`}
-                  className="block rounded-lg border border-gray-200 p-4 transition hover:border-[#1E3A5F]"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-gray-900">
-                      {posting.churchProfile.churchName}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {new Date(posting.serviceDate).toLocaleDateString('ko-KR')}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-gray-500">{posting.location}</p>
-                  <div className="mt-2 flex gap-1">
-                    {posting.neededInstruments.map((inst) => (
-                      <span
-                        key={inst}
-                        className="rounded-full bg-[#4A7FBF]/10 px-2 py-0.5 text-xs text-[#1E3A5F]"
-                      >
-                        {inst}
-                      </span>
-                    ))}
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
+interface Posting { id: string; serviceDate: string; neededInstruments: string[]; location: string; churchProfile: { churchName: string; organizationType: string | null }; }
+export default function PostingsPage() { const [postings, setPostings] = useState<Posting[]>([]); const [part, setPart] = useState(''); const [date, setDate] = useState(''); const [error, setError] = useState(''); useEffect(() => { apiFetch<Posting[]>('/postings').then(setPostings).catch((err) => setError(err instanceof Error ? err.message : '공고를 불러오지 못했습니다.')); }, []); const filtered = useMemo(() => postings.filter((posting) => (!part || posting.neededInstruments.includes(part)) && (!date || posting.serviceDate.slice(0, 10) === date)), [date, part, postings]); return <main className="bg-slate-50 px-4 py-7"><div className="mx-auto max-w-6xl"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-bold text-[#1463FF]">MINISTRY OPENINGS</p><h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-950">사역 공고</h1></div><Link href="/postings/new" className="rounded-xl bg-[#1463FF] px-4 py-2.5 text-sm font-bold text-white">공고 등록</Link></div><section className="mt-5 flex flex-wrap gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><select value={part} onChange={(e) => setPart(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm"><option value="">전체 파트</option>{MINISTRY_PARTS.map((item) => <option key={item}>{item}</option>)}</select><input value={date} onChange={(e) => setDate(e.target.value)} type="date" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />{(part || date) && <button onClick={() => { setPart(''); setDate(''); }} className="px-2 text-sm font-bold text-slate-500">필터 초기화</button>}<span className="ml-auto self-center text-sm text-slate-400">{filtered.length}개 공고</span></section>{error && <p className="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}<div className="mt-5 grid gap-3">{filtered.map((posting) => <Link key={posting.id} href={`/postings/${posting.id}`} className="group flex flex-col justify-between gap-4 rounded-2xl border border-transparent bg-white p-5 shadow-sm transition hover:border-blue-100 hover:shadow-md sm:flex-row sm:items-center"><div><p className="text-sm font-bold text-[#1463FF]">{posting.churchProfile.organizationType ?? '모집자'}</p><h2 className="mt-1 text-lg font-extrabold text-slate-900">{posting.churchProfile.churchName}</h2><p className="mt-1 text-sm text-slate-500">{posting.location}</p><div className="mt-3 flex flex-wrap gap-1.5">{posting.neededInstruments.map((item) => <span key={item} className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">{item}</span>)}</div></div><div className="text-left sm:text-right"><p className="font-bold text-slate-800">{new Date(posting.serviceDate).toLocaleDateString('ko-KR')}</p><p className="mt-2 text-sm font-bold text-[#1463FF]">자세히 보기 →</p></div></Link>)}</div>{filtered.length === 0 && !error && <p className="mt-5 rounded-2xl bg-white p-12 text-center text-slate-500">조건에 맞는 공고가 없습니다.</p>}</div></main>; }
